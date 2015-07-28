@@ -698,10 +698,13 @@ int measure_print(measure_state_t *state, int flags) {
 		million_idq_ms_uops_per_second = idq_ms_uops / time_elapsed * 1e-6;
 		if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("%-26s%12lld\t(%12.3f M/sec)\n", perf_event_4_pretty_name, idq_ms_uops, million_idq_ms_uops_per_second);
 	}
+#if 0
 	if (!(flags & MEASURE_FLAG_NO_PRINT)) {
 		printf("\n");
+		/* Tabs between fields allow easy pasting to Libreoffice */
 		printf("Spreadsheet dump: %.6f\t%.3fe6\t%.3fe6\t%.3fe6\t%.3fe6\t%.3fe6\t%.3f\t%.3f\n", time_elapsed, million_instructions_per_second, million_uops_per_second, million_idq_mite_uops_per_second, million_idq_dsb_uops_per_second, million_idq_ms_uops_per_second, pkg_power, pp0_power);
 	}
+#endif
 	
 	/* Success */
 	return 1;
@@ -869,6 +872,9 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		}
 	}
 	
+	/* Seed random number generator with a constant seed to make the result reproducible */
+	srand(0xdeadbeef);
+	
 	/* Less output when repeating */
 	if (arg_num_repeat > 1) {
 		quiet_mode = 1;
@@ -883,6 +889,14 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		fprintf(stderr, "Error: measure_alloc failed!\n");
 		exit(EXIT_FAILURE);
 	}
+	
+	/* Pre-warmup of all the benchmark hook functions */
+	void *pre_warmup_benchdata = NULL;
+	bench->init(&pre_warmup_benchdata);
+	bench->warmup(pre_warmup_benchdata, 0);
+	bench->normal(pre_warmup_benchdata, 0);
+	bench->extreme(pre_warmup_benchdata, 0);
+	bench->cleanup(pre_warmup_benchdata);
 	
 	/* Call initialization hook for every thread structure */
 	for (i = 0; i < arg_num_threads; i++) {
