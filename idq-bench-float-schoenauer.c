@@ -15,15 +15,9 @@
 #include "measure-util.h"
 
 /*
- * The arrays should fit in the nearest L3 cache segment, which is 2 MB on Intel processors.
- * 3 arrays * 65536 elements/array * 8 bytes/element = 1536 kB
+ * Number of inner loop iterations.
  */
 #define ARRAY_SIZE	1024
-
-/*
- * Align arrays to a 2 MB boundary.
- */
-#define ARRAY_ALIGNMENT	2097152
 
 /*
  * Loop enough times to make the power consumption measurable.

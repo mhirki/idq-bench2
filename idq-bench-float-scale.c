@@ -15,16 +15,9 @@
 #include "measure-util.h"
 
 /*
- * The arrays should fit in L1 cache, which is 32 kB on Intel processors.
- * 1 array * 2048 elements/array * 8 bytes/element = 16 kB
+ * Number of inner loop iterations.
  */
 #define ARRAY_SIZE	2048
-#define NUM_ARRAYS	1
-
-/*
- * Align arrays to a 2 MB boundary.
- */
-#define ARRAY_ALIGNMENT	2097152
 
 /*
  * Loop enough times to make the power consumption measurable.
