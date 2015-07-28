@@ -3,7 +3,7 @@ CC = gcc
 LIBS_PAPI = -lpapi
 LIBS = -lrt $(LIBS_PAPI)
 
-BINARY_TARGETS = idq-bench-float-addmul idq-bench-float-array-l1-addmul idq-bench-float-array-l2-addmul idq-bench-float-array-l3-addmul idq-bench-float-add idq-bench-float-array-l1-add idq-bench-float-array-l2-add idq-bench-float-array-l3-add
+BINARY_TARGETS = idq-bench-float-addmul idq-bench-float-array-l1-addmul idq-bench-float-array-l2-addmul idq-bench-float-array-l3-addmul idq-bench-float-add idq-bench-float-array-l1-add idq-bench-float-array-l2-add idq-bench-float-array-l3-add idq-bench-float-schoenauer idq-bench-float-array-l1-schoenauer idq-bench-float-array-l2-schoenauer idq-bench-float-array-l3-schoenauer
 
 all: $(BINARY_TARGETS)
 
