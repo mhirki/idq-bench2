@@ -37,7 +37,7 @@
 typedef double kernel_data_t;
 
 /* Exponential macro expansion */
-#define ADD_1 magic += scalar * a[j]; j++;
+#define ADD_1 sum += scalar * a[j]; j++;
 #define ADD_2 ADD_1 ADD_1
 #define ADD_4 ADD_2 ADD_2
 #define ADD_8 ADD_4 ADD_4
@@ -55,35 +55,35 @@ typedef double kernel_data_t;
  */
 kernel_data_t kernel_warmup(long ntimes, kernel_data_t *a, kernel_data_t scalar) {
 	long i = 0, j = 0;
-	kernel_data_t magic = 0;
+	kernel_data_t sum = 0;
 	for (i = 0; i < ntimes; i++) {
 		for (j = 0; j < ARRAY_SIZE;) {
 			ADD_128
 		}
 	}
-	return magic;
+	return sum;
 }
 
 kernel_data_t kernel_normal(long ntimes, kernel_data_t *a, kernel_data_t scalar) {
 	long i = 0, j = 0;
-	kernel_data_t magic = 0;
+	kernel_data_t sum = 0;
 	for (i = 0; i < ntimes; i++) {
 		for (j = 0; j < ARRAY_SIZE;) {
 			ADD_128
 		}
 	}
-	return magic;
+	return sum;
 }
 
 kernel_data_t kernel_extreme(long ntimes, kernel_data_t *a, kernel_data_t scalar) {
 	long i = 0, j = 0;
-	kernel_data_t magic = 0;
+	kernel_data_t sum = 0;
 	for (i = 0; i < ntimes; i++) {
 		for (j = 0; j < ARRAY_SIZE;) {
 			ADD_1024
 		}
 	}
-	return magic;
+	return sum;
 }
 
 typedef struct {
