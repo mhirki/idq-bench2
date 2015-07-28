@@ -19,6 +19,7 @@
  * 2 arrays * 2048 elements/array * 8 bytes/element = 32768 bytes = 32 kB
  */
 #define ARRAY_SIZE	2048
+#define NUM_ARRAYS	2
 
 /*
  * Align arrays to a 2 MB boundary.
@@ -94,11 +95,23 @@ typedef struct {
 static int bench_init(void **benchdata) {
 	benchdata_t *data = calloc(1, sizeof(benchdata_t));
 	*benchdata = data;
+	kernel_data_t *a = NULL;
+	long i = 0;
 	
 	/* Allocate memory for the data arrays */
-	data->a = measure_aligned_alloc(2 * ARRAY_SIZE * sizeof(kernel_data_t), ARRAY_ALIGNMENT);
+	data->a = a = measure_aligned_alloc(NUM_ARRAYS * ARRAY_SIZE * sizeof(kernel_data_t), ARRAY_ALIGNMENT);
 	data->b = data->a + ARRAY_SIZE;
-	data->scalar = 3;
+	
+	/* Fill with random numbers */
+	if (arg_use_64bit_numbers) {
+		for (i = 0; i < NUM_ARRAYS * ARRAY_SIZE; i++) {
+			a[i] = rand64();
+		}
+	} else {
+		for (i = 0; i < NUM_ARRAYS * ARRAY_SIZE; i++) {
+			a[i] = (float)rand();
+		}
+	}
 	
 	/* Success */
 	return 1;

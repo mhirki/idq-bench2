@@ -19,6 +19,7 @@
  * 2 arrays * 65536 elements/array * 8 bytes/element = 1 MB
  */
 #define ARRAY_SIZE	65536
+#define NUM_ARRAYS	2
 
 /*
  * Align arrays to a 2 MB boundary.
@@ -52,8 +53,7 @@ typedef double kernel_data_t;
 /*
  * Benchmark kernels
  */
-kernel_data_t kernel_warmup(long ntimes, kernel_data_t *a, kernel_data_t *b) {
-	(void)b;
+kernel_data_t kernel_warmup(long ntimes, kernel_data_t *a) {
 	long i = 0, j = 0;
 	kernel_data_t magic = 0;
 	for (i = 0; i < ntimes; i++) {
@@ -64,8 +64,7 @@ kernel_data_t kernel_warmup(long ntimes, kernel_data_t *a, kernel_data_t *b) {
 	return magic;
 }
 
-kernel_data_t kernel_normal(long ntimes, kernel_data_t *a, kernel_data_t *b) {
-	(void)b;
+kernel_data_t kernel_normal(long ntimes, kernel_data_t *a) {
 	long i = 0, j = 0;
 	kernel_data_t magic = 0;
 	for (i = 0; i < ntimes; i++) {
@@ -76,8 +75,7 @@ kernel_data_t kernel_normal(long ntimes, kernel_data_t *a, kernel_data_t *b) {
 	return magic;
 }
 
-kernel_data_t kernel_extreme(long ntimes, kernel_data_t *a, kernel_data_t *b) {
-	(void)b;
+kernel_data_t kernel_extreme(long ntimes, kernel_data_t *a) {
 	long i = 0, j = 0;
 	kernel_data_t magic = 0;
 	for (i = 0; i < ntimes; i++) {
@@ -90,16 +88,27 @@ kernel_data_t kernel_extreme(long ntimes, kernel_data_t *a, kernel_data_t *b) {
 
 typedef struct {
 	kernel_data_t *a;
-	kernel_data_t *b;
 } benchdata_t;
 
 static int bench_init(void **benchdata) {
 	benchdata_t *data = calloc(1, sizeof(benchdata_t));
 	*benchdata = data;
+	kernel_data_t *a = NULL;
+	long i = 0;
 	
 	/* Allocate memory for the data arrays */
-	data->a = measure_aligned_alloc(2 * ARRAY_SIZE * sizeof(kernel_data_t), ARRAY_ALIGNMENT);
-	data->b = data->a + ARRAY_SIZE;
+	data->a = a = measure_aligned_alloc(NUM_ARRAYS * ARRAY_SIZE * sizeof(kernel_data_t), ARRAY_ALIGNMENT);
+	
+	/* Fill with random numbers */
+	if (arg_use_64bit_numbers) {
+		for (i = 0; i < NUM_ARRAYS * ARRAY_SIZE; i++) {
+			a[i] = rand64();
+		}
+	} else {
+		for (i = 0; i < NUM_ARRAYS * ARRAY_SIZE; i++) {
+			a[i] = (float)rand();
+		}
+	}
 	
 	/* Success */
 	return 1;
@@ -107,17 +116,17 @@ static int bench_init(void **benchdata) {
 
 static int bench_warmup(void *benchdata, long ntimes) {
 	benchdata_t *data = benchdata;
-	return kernel_warmup(ntimes, data->a, data->b);
+	return kernel_warmup(ntimes, data->a);
 }
 
 static int bench_normal(void *benchdata, long ntimes) {
 	benchdata_t *data = benchdata;
-	return kernel_normal(ntimes, data->a, data->b);
+	return kernel_normal(ntimes, data->a);
 }
 
 static int bench_extreme(void *benchdata, long ntimes) {
 	benchdata_t *data = benchdata;
-	return kernel_extreme(ntimes, data->a, data->b);
+	return kernel_extreme(ntimes, data->a);
 }
 
 static int bench_cleanup(void *benchdata) {
