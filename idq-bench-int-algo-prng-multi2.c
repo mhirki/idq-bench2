@@ -1,7 +1,7 @@
 /*
  * Benchmark designed to stress the instruction decoders. Designed for Intel Haswell microarchitecture. Compiled with GCC 4.4.
  *
- * Usage: ./idq-bench-int-algo-prng [ -b ] [ -m ] [ -n <running time multiplier> ] [ -r <number of times to repeat> ]
+ * Usage: ./idq-bench-int-algo-prng-multi2 [ -b ] [ -m ] [ -n <running time multiplier> ] [ -r <number of times to repeat> ]
  *
  * Author: Mikael Hirki <mikael.hirki@aalto.fi>
  */
@@ -30,7 +30,7 @@
 typedef unsigned long long kernel_data_t;
 
 /* Exponential macro expansion */
-#define ADD_1 magic = (1103515245 * magic + 12345); j++;
+#define ADD_1 magic *= 1103515245; magic += 12345; magic2 *= 1664525; magic2 += 1013904223; j++;
 #define ADD_2 ADD_1 ADD_1
 #define ADD_4 ADD_2 ADD_2
 #define ADD_8 ADD_4 ADD_4
@@ -48,35 +48,35 @@ typedef unsigned long long kernel_data_t;
  */
 kernel_data_t kernel_warmup(long ntimes) {
 	long i = 0, j = 0;
-	kernel_data_t magic = 0;
+	kernel_data_t magic = 0, magic2 = 0;
 	for (i = 0; i < ntimes; i++) {
 		for (j = 0; j < ARRAY_SIZE;) {
 			ADD_128
 		}
 	}
-	return magic;
+	return magic + magic2;
 }
 
 kernel_data_t kernel_normal(long ntimes) {
 	long i = 0, j = 0;
-	kernel_data_t magic = 0;
+	kernel_data_t magic = 0, magic2 = 0;
 	for (i = 0; i < ntimes; i++) {
 		for (j = 0; j < ARRAY_SIZE;) {
 			ADD_128
 		}
 	}
-	return magic;
+	return magic + magic2;
 }
 
 kernel_data_t kernel_extreme(long ntimes) {
 	long i = 0, j = 0;
-	kernel_data_t magic = 0;
+	kernel_data_t magic = 0, magic2 = 0;
 	for (i = 0; i < ntimes; i++) {
 		for (j = 0; j < ARRAY_SIZE;) {
 			ADD_1024
 		}
 	}
-	return magic;
+	return magic + magic2;
 }
 
 typedef struct {
