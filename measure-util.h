@@ -89,6 +89,10 @@ typedef struct {
 	double pp1_power_before;
 	double dram_power_before;
 	double time_elapsed_before;
+	double event_1_before;
+	double event_2_before;
+	double event_3_before;
+	double event_4_before;
 	
 	/* Indices for PAPI event sets */
 	int idx_pkg_energy;

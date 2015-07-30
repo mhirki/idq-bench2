@@ -10,8 +10,6 @@
  * Compiler: gcc version 4.4.7 20120313 (Red Hat 4.4.7-11)
  * Compiler optimizations: -O2
  *
- * TODO: Add temperature and voltage measurement
- *
  * Author: Mikael Hirki <mikael.hirki@aalto.fi>
  */
 
@@ -255,6 +253,10 @@ int measure_init_thread(measure_state_t *state, int flags) {
 	state->pp1_power_before = 0.0;
 	state->dram_power_before = 0.0;
 	state->time_elapsed_before = 0.0;
+	state->event_1_before = 0.0;
+	state->event_2_before = 0.0;
+	state->event_3_before = 0.0;
+	state->event_4_before = 0.0;
 	state->idx_pkg_energy = -1;
 	state->idx_pp0_energy = -1;
 	state->idx_pp1_energy = -1;
@@ -573,27 +575,28 @@ int measure_print(measure_state_t *state, int flags) {
 	double million_uops_per_second = 0, million_idq_mite_uops_per_second = 0, million_idq_dsb_uops_per_second = 0, million_idq_ms_uops_per_second = 0;
 	long long *papi_energy_values = state->papi_energy_values;
 	long long *papi_perf_values = state->papi_perf_values;
+	char print_results = !(flags & MEASURE_FLAG_NO_PRINT);
 	
 	double time_elapsed = (state->end_time.tv_sec - state->begin_time.tv_sec) + (state->end_time.tv_nsec - state->begin_time.tv_nsec) * 1e-9;
 	state->time_elapsed_before = time_elapsed;
 	
-	if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("Time elapsed: %12.6f seconds\n", time_elapsed);
+	if (print_results) printf("Time elapsed: %12.6f seconds\n", time_elapsed);
 	/* Print the TSC value */
 	{
 		unsigned long long tsc_elapsed = state->end_tsc - state->begin_tsc;
 		double tsc_freq = tsc_elapsed / time_elapsed * 1e-9;
-		if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("TSC elapsed:  %12llu\t(%12.3f GHz)\n", tsc_elapsed, tsc_freq);
+		if (print_results) printf("TSC elapsed:  %12llu\t(%12.3f GHz)\n", tsc_elapsed, tsc_freq);
 	}
 	if (state->have_rapl) {
-		if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("\n");
+		if (print_results) printf("\n");
 		if (state->idx_pkg_energy != -1) {
 			double pkg_energy = papi_energy_values[state->idx_pkg_energy] * ENERGY_SCALE_FACTOR;
 			pkg_power = pkg_energy / time_elapsed;
 			if (state->pkg_power_before != 0.0) {
 				double power_delta = pkg_power - state->pkg_power_before;
-				if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("PKG energy consumed:  %12.6f joules\t(%12.3f watts)\t[delta %+12.3f watts]\n", pkg_energy, pkg_power, power_delta);
+				if (print_results) printf("PKG energy consumed:  %12.6f joules\t(%12.3f watts)\t[delta %+12.3f watts]\n", pkg_energy, pkg_power, power_delta);
 			} else {
-				if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("PKG energy consumed:  %12.6f joules\t(%12.3f watts)\n", pkg_energy, pkg_power);
+				if (print_results) printf("PKG energy consumed:  %12.6f joules\t(%12.3f watts)\n", pkg_energy, pkg_power);
 			}
 			state->pkg_power_before = pkg_power;
 		}
@@ -602,9 +605,9 @@ int measure_print(measure_state_t *state, int flags) {
 			pp0_power = pp0_energy / time_elapsed;
 			if (state->pp0_power_before != 0.0) {
 				double power_delta = pp0_power - state->pp0_power_before;
-				if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("PP0 energy consumed:  %12.6f joules\t(%12.3f watts)\t[delta %+12.3f watts]\n", pp0_energy, pp0_power, power_delta);
+				if (print_results) printf("PP0 energy consumed:  %12.6f joules\t(%12.3f watts)\t[delta %+12.3f watts]\n", pp0_energy, pp0_power, power_delta);
 			} else {
-				if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("PP0 energy consumed:  %12.6f joules\t(%12.3f watts)\n", pp0_energy, pp0_power);
+				if (print_results) printf("PP0 energy consumed:  %12.6f joules\t(%12.3f watts)\n", pp0_energy, pp0_power);
 			}
 			state->pp0_power_before = pp0_power;
 		}
@@ -613,9 +616,9 @@ int measure_print(measure_state_t *state, int flags) {
 			pp1_power = pp1_energy / time_elapsed;
 			if (state->pp1_power_before != 0.0) {
 				double power_delta = pp1_power - state->pp1_power_before;
-				if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("PP1 energy consumed:  %12.6f joules\t(%12.3f watts)\t[delta %+12.3f watts]\n", pp1_energy, pp1_power, power_delta);
+				if (print_results) printf("PP1 energy consumed:  %12.6f joules\t(%12.3f watts)\t[delta %+12.3f watts]\n", pp1_energy, pp1_power, power_delta);
 			} else {
-				if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("PP1 energy consumed:  %12.6f joules\t(%12.3f watts)\n", pp1_energy, pp1_power);
+				if (print_results) printf("PP1 energy consumed:  %12.6f joules\t(%12.3f watts)\n", pp1_energy, pp1_power);
 			}
 			state->pp1_power_before = pp1_power;
 		}
@@ -624,14 +627,14 @@ int measure_print(measure_state_t *state, int flags) {
 			dram_power = dram_energy / time_elapsed;
 			if (state->dram_power_before != 0.0) {
 				double power_delta = dram_power - state->dram_power_before;
-				if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("DRAM energy consumed: %12.6f joules\t(%12.3f watts)\t[delta %+12.3f watts]\n", dram_energy, dram_power, power_delta);
+				if (print_results) printf("DRAM energy consumed: %12.6f joules\t(%12.3f watts)\t[delta %+12.3f watts]\n", dram_energy, dram_power, power_delta);
 			} else {
-				if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("DRAM energy consumed: %12.6f joules\t(%12.3f watts)\n", dram_energy, dram_power);
+				if (print_results) printf("DRAM energy consumed: %12.6f joules\t(%12.3f watts)\n", dram_energy, dram_power);
 			}
 			state->dram_power_before = dram_power;
 		}
 	}
-	if (!(flags & MEASURE_FLAG_NO_PRINT)) {
+	if (print_results) {
 		if (state->begin_temp_pkg != 0) {
 			printf("\n");
 			printf("Temp PKG:   %.0f  -->  %.0f\n", state->begin_temp_pkg, state->end_temp_pkg);
@@ -666,45 +669,58 @@ int measure_print(measure_state_t *state, int flags) {
 	if (state->idx_cycles != -1) {
 		long long cycles_elapsed = papi_perf_values[state->idx_cycles];
 		million_cycles_per_second = cycles_elapsed / time_elapsed * 1e-6;
-		if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("%-26s%12lld\t(%12.3f M/sec)\n", "Cycles elapsed:", cycles_elapsed, million_cycles_per_second);
+		if (print_results) printf("%-26s%12lld\t(%12.3f M/sec)\n", "Cycles elapsed:", cycles_elapsed, million_cycles_per_second);
 	}
 	if (state->idx_ref_cycles != -1) {
 		long long ref_cycles_elapsed = papi_perf_values[state->idx_ref_cycles];
 		million_ref_cycles_per_second = ref_cycles_elapsed / time_elapsed * 1e-6;
-		if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("%-26s%12lld\t(%12.3f M/sec)\n", "Reference cycles elapsed:", ref_cycles_elapsed, million_ref_cycles_per_second);
+		if (print_results) printf("%-26s%12lld\t(%12.3f M/sec)\n", "Reference cycles elapsed:", ref_cycles_elapsed, million_ref_cycles_per_second);
 	}
 	if (state->idx_instructions != -1) {
 		long long instructions_retired = papi_perf_values[state->idx_instructions];
 		million_instructions_per_second = instructions_retired / time_elapsed * 1e-6;
-		if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("%-26s%12lld\t(%12.3f M/sec)\n", "Instructions retired:", instructions_retired, million_instructions_per_second);
+		if (print_results) printf("%-26s%12lld\t(%12.3f M/sec)\n", "Instructions retired:", instructions_retired, million_instructions_per_second);
 	}
 	if (state->idx_event_1 != -1) {
 		long long uops_issued = papi_perf_values[state->idx_event_1];
-		million_uops_per_second = uops_issued / time_elapsed * 1e-6;
-		if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("%-26s%12lld\t(%12.3f M/sec)\n", perf_event_1_pretty_name, uops_issued, million_uops_per_second);
+		double uops_per_second = uops_issued / time_elapsed;
+		million_uops_per_second = uops_per_second * 1e-6;
+		state->event_1_before = uops_per_second;
+		if (print_results) printf("%-26s%12lld\t(%12.3f M/sec)\n", perf_event_1_pretty_name, uops_issued, million_uops_per_second);
 	}
 	if (state->idx_event_2 != -1) {
 		long long idq_mite_uops = papi_perf_values[state->idx_event_2];
-		million_idq_mite_uops_per_second = idq_mite_uops / time_elapsed * 1e-6;
-		if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("%-26s%12lld\t(%12.3f M/sec)\n", perf_event_2_pretty_name, idq_mite_uops, million_idq_mite_uops_per_second);
+		double idq_mite_uops_per_second = idq_mite_uops / time_elapsed;
+		million_idq_mite_uops_per_second = idq_mite_uops_per_second * 1e-6;
+		state->event_2_before = idq_mite_uops_per_second;
+		if (print_results) printf("%-26s%12lld\t(%12.3f M/sec)\n", perf_event_2_pretty_name, idq_mite_uops, million_idq_mite_uops_per_second);
 	}
 	if (state->idx_event_3 != -1) {
 		long long idq_dsb_uops = papi_perf_values[state->idx_event_3];
-		million_idq_dsb_uops_per_second = idq_dsb_uops / time_elapsed * 1e-6;
-		if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("%-26s%12lld\t(%12.3f M/sec)\n", perf_event_3_pretty_name, idq_dsb_uops, million_idq_dsb_uops_per_second);
+		double idq_dsb_uops_per_second = idq_dsb_uops / time_elapsed;
+		million_idq_dsb_uops_per_second = idq_dsb_uops_per_second * 1e-6;
+		state->event_3_before = idq_dsb_uops_per_second;
+		if (print_results) printf("%-26s%12lld\t(%12.3f M/sec)\n", perf_event_3_pretty_name, idq_dsb_uops, million_idq_dsb_uops_per_second);
 	}
 	if (state->idx_event_4 != -1) {
 		long long idq_ms_uops = papi_perf_values[state->idx_event_4];
-		million_idq_ms_uops_per_second = idq_ms_uops / time_elapsed * 1e-6;
-		if (!(flags & MEASURE_FLAG_NO_PRINT)) printf("%-26s%12lld\t(%12.3f M/sec)\n", perf_event_4_pretty_name, idq_ms_uops, million_idq_ms_uops_per_second);
+		double idq_ms_uops_per_second = idq_ms_uops / time_elapsed;
+		million_idq_ms_uops_per_second = idq_ms_uops_per_second * 1e-6;
+		state->event_4_before = idq_ms_uops_per_second;
+		if (print_results) printf("%-26s%12lld\t(%12.3f M/sec)\n", perf_event_4_pretty_name, idq_ms_uops, million_idq_ms_uops_per_second);
 	}
 #if 0
-	if (!(flags & MEASURE_FLAG_NO_PRINT)) {
+	if (print_results) {
 		printf("\n");
 		/* Tabs between fields allow easy pasting to Libreoffice */
 		printf("Spreadsheet dump: %.6f\t%.3fe6\t%.3fe6\t%.3fe6\t%.3fe6\t%.3fe6\t%.3f\t%.3f\n", time_elapsed, million_instructions_per_second, million_uops_per_second, million_idq_mite_uops_per_second, million_idq_dsb_uops_per_second, million_idq_ms_uops_per_second, pkg_power, pp0_power);
 	}
 #endif
+	
+	/* Flush the output (helps when outputting to a file) */
+	if (print_results) {
+		fflush(stdout);
+	}
 	
 	/* Success */
 	return 1;
@@ -910,7 +926,10 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	
 	/* Warmup phase */
 	if ((arg_benchmark_phase == -1 || arg_benchmark_phase == 0) && arg_warmup_time > 0) {
-		if (!quiet_mode) printf("Running warmup for estimated %d seconds.\n", arg_warmup_time);
+		if (!quiet_mode) {
+			printf("Running warmup for estimated %d seconds.\n", arg_warmup_time);
+			fflush(stdout);
+		}
 		double warmup_start = gettimeofday_double();
 		/* Calibration with the default ntimes value */
 		for (i = 0; i < arg_num_threads; i++) {
@@ -931,7 +950,10 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		}
 		double warmup_calibration_end = gettimeofday_double();
 		double warmup_calibration_duration = warmup_calibration_end - warmup_start;
-		if (!quiet_mode) printf("Warmup calibration of %ld iterations completed in %f seconds.\n", bench->ntimes, warmup_calibration_duration);
+		if (!quiet_mode) {
+			printf("Warmup calibration of %ld iterations completed in %f seconds.\n", bench->ntimes, warmup_calibration_duration);
+			fflush(stdout);
+		}
 		/* Estimate for ntimes to reach the requested warmup time */
 		double ntimes_scale_factor = (arg_warmup_time - warmup_calibration_duration) / warmup_calibration_duration;
 		if (ntimes_scale_factor > 0) {
@@ -953,7 +975,19 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 			}
 		}
 		double warmup_end = gettimeofday_double();
-		if (!quiet_mode) printf("Warmup complete in %f seconds.\n", warmup_end - warmup_start);
+		if (!quiet_mode) {
+			printf("Warmup complete in %f seconds.\n", warmup_end - warmup_start);
+			fflush(stdout);
+		}
+	}
+	
+	// Print CSV-output column names
+	if (arg_num_repeat > 1) {
+		printf("num_threads"
+		       ",time_elapsed_normal,uops_issued_normal,idq_mite_normal,pkg_power_normal,pp0_power_normal"
+		       ",time_elapsed_extreme,uops_issued_extreme,idq_mite_extreme,pkg_power_extreme,pp0_power_extreme"
+		       "\n");
+		fflush(stdout);
 	}
 	
 	/* Repeat requested number of times */
@@ -961,6 +995,9 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		double pkg_power_normal = 0, pp0_power_normal = 0;
 		double pkg_power_extreme = 0, pp0_power_extreme = 0;
 		double time_elapsed_normal = 0, time_elapsed_extreme = 0;
+		double uops_issued_normal = 0, uops_issued_extreme = 0;
+		double idq_mite_uops_normal = 0, idq_mite_uops_extreme = 0;
+		double pkg_temp_normal = 0, pkg_temp_extreme = 0;
 		
 		/* Normal version */
 		if (arg_benchmark_phase == -1 || arg_benchmark_phase == 1) {
@@ -969,6 +1006,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 				printf("========================================================================\n");
 				printf("\n");
 				printf("Running %ld iterations of normal version\n", bench->ntimes);
+				fflush(stdout);
 			}
 			if (arg_do_measure) measure_start(&measure_state, measure_flags);
 			for (i = 0; i < arg_num_threads; i++) {
@@ -996,6 +1034,9 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 				pkg_power_normal = measure_state.pkg_power_before;
 				pp0_power_normal = measure_state.pp0_power_before;
 				time_elapsed_normal = measure_state.time_elapsed_before;
+				uops_issued_normal = measure_state.event_1_before;
+				idq_mite_uops_normal = measure_state.event_2_before;
+				pkg_temp_normal = measure_state.end_temp_pkg;
 			}
 		}
 		
@@ -1006,6 +1047,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 				printf("========================================================================\n");
 				printf("\n");
 				printf("Running %ld iterations of extreme unrolled version\n", bench->ntimes);
+				fflush(stdout);
 			}
 			if (arg_do_measure) measure_start(&measure_state, measure_flags);
 			for (i = 0; i < arg_num_threads; i++) {
@@ -1033,12 +1075,20 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 				pkg_power_extreme = measure_state.pkg_power_before;
 				pp0_power_extreme = measure_state.pp0_power_before;
 				time_elapsed_extreme = measure_state.time_elapsed_before;
+				uops_issued_extreme = measure_state.event_1_before;
+				idq_mite_uops_extreme = measure_state.event_2_before;
+				pkg_temp_extreme = measure_state.end_temp_pkg;
 			}
 		}
 		
 		/* Print compact power consumption numbers when repeating multiple times */
 		if (arg_num_repeat > 1) {
-			printf("%d,%f,%f,%f,%f,%f,%f\n", arg_num_threads, time_elapsed_normal, pkg_power_normal, pp0_power_normal, time_elapsed_extreme, pkg_power_extreme, pp0_power_extreme);
+			printf("%d,%f,%.0f,%.0f,%f,%f,%f,%.0f,%.0f,%f,%f\n", arg_num_threads,
+			       time_elapsed_normal, uops_issued_normal, idq_mite_uops_normal,
+			       pkg_power_normal, pp0_power_normal,
+			       time_elapsed_extreme, uops_issued_extreme, idq_mite_uops_extreme,
+			       pkg_power_extreme, pp0_power_extreme);
+			fflush(stdout);
 		}
 	}
 	
