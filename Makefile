@@ -2,6 +2,7 @@ CFLAGS = -pthread -Wall -Wextra -O2 -g
 CC = gcc
 LIBS_PAPI = -lpapi
 LIBS = -lrt $(LIBS_PAPI)
+LDFLAGS = -Wl,-z,now
 
 BINARY_TARGETS = idq-bench-float-addmul idq-bench-float-array-l1-addmul idq-bench-float-array-l2-addmul idq-bench-float-array-l3-addmul \
                  idq-bench-float-add idq-bench-float-array-l1-add idq-bench-float-array-l2-add idq-bench-float-array-l3-add \
@@ -23,4 +24,4 @@ measure-util.o: measure-util.c
 
 # Implicit rule for making executable binaries
 %: %.c measure-util.o
-	$(CC) $(CFLAGS) -o $@ $< measure-util.o $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< measure-util.o $(LIBS)
