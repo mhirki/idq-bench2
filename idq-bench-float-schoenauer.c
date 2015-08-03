@@ -51,7 +51,7 @@ kernel_data_t kernel_warmup(long ntimes, kernel_data_t a, kernel_data_t b, kerne
 	kernel_data_t sum = 0;
 	for (i = 0; i < ntimes; i++) {
 		for (j = 0; j < ARRAY_SIZE;) {
-			ADD_128
+			ADD_512
 		}
 	}
 	return sum;
@@ -62,7 +62,7 @@ kernel_data_t kernel_normal(long ntimes, kernel_data_t a, kernel_data_t b, kerne
 	kernel_data_t sum = 0;
 	for (i = 0; i < ntimes; i++) {
 		for (j = 0; j < ARRAY_SIZE;) {
-			ADD_128
+			ADD_512
 		}
 	}
 	return sum;
@@ -73,7 +73,7 @@ kernel_data_t kernel_extreme(long ntimes, kernel_data_t a, kernel_data_t b, kern
 	kernel_data_t sum = 0;
 	for (i = 0; i < ntimes; i++) {
 		for (j = 0; j < ARRAY_SIZE;) {
-			ADD_512
+			ADD_1024
 		}
 	}
 	return sum;
