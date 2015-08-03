@@ -10,6 +10,7 @@ BINARY_TARGETS = idq-bench-float-addmul idq-bench-float-array-l1-addmul idq-benc
                  idq-bench-float-array-l1-triad idq-bench-float-array-l2-triad idq-bench-float-array-l3-triad \
                  idq-bench-float-scale idq-bench-float-array-l1-scale idq-bench-float-array-l2-scale idq-bench-float-array-l3-scale \
                  idq-bench-int-array-l1-addmul idq-bench-int-array-l2-addmul idq-bench-int-array-l3-addmul \
+                 idq-bench-int-array-l1-addmulshift idq-bench-int-array-l2-addmulshift idq-bench-int-array-l3-addmulshift \
                  idq-bench-int-algo-prng idq-bench-int-algo-prng-multi2 idq-bench-int-algo-prng-multi3 idq-bench-int-algo-prng-multi3b idq-bench-int-algo-prng-multi3c idq-bench-int-algo-prng-multi4
 
 all: $(BINARY_TARGETS)
