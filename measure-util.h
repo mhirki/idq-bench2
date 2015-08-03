@@ -164,6 +164,7 @@ extern int  arg_benchmark_phase;
 extern int  arg_num_threads;
 extern int  arg_num_repeat;
 extern int  arg_warmup_time;
+extern char arg_force_affinity;
 
 int measure_main(int argc, char **argv, measure_benchmark_t *bench);
 

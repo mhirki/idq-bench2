@@ -13,6 +13,9 @@
  * Author: Mikael Hirki <mikael.hirki@aalto.fi>
  */
 
+/* Needed for setting CPU affinity */
+#define _GNU_SOURCE
+
 #include "measure-util.h"
 
 #include <stdio.h>
@@ -48,6 +51,9 @@ static int core3_fd = -1;
 
 /* Running as root is required for RAPL, temperature and voltage information */
 static char running_as_root = 1;
+
+/* Number of CPUs available */
+static int cpus_available = 1;
 
 static void measure_warmup(measure_state_t *state);
 
@@ -224,6 +230,9 @@ int measure_init_papi(int flags) {
 			}
 		}
 	}
+	
+	/* Update the number of CPUs available */
+	cpus_available = sysconf(_SC_NPROCESSORS_ONLN);
 	
 	/* Success */
 	return 1;
@@ -813,6 +822,19 @@ static void *measure_benchmark_thread(void *arg) {
 }
 
 /*
+ * Helper function for forcing thread affinity.
+ */
+static void measure_set_thread_affinity(pthread_attr_t *attr, int thread_num) {
+	if (arg_force_affinity) {
+		cpu_set_t mask;
+		int cpu_num = thread_num % cpus_available;
+		CPU_ZERO(&mask);
+		CPU_SET(cpu_num, &mask);
+		pthread_attr_setaffinity_np(attr, sizeof(mask), &mask);
+	}
+}
+
+/*
  * Parsed command line parameters
  */
 char arg_do_measure        = 0;
@@ -822,6 +844,7 @@ int  arg_num_threads       = 1;
 int  arg_num_repeat        = 1;
 int  arg_multiplier        = 1;
 int  arg_warmup_time       = 120; /* 2 minutes */
+char arg_force_affinity    = 0;
 
 int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	long i = 0, j = 0;
@@ -832,40 +855,54 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	measure_state_t measure_state;
 	char quiet_mode = 0;
 	memset(&measure_state, 0, sizeof(measure_state));
+	pthread_attr_t attr, *attrp = NULL;
+	pthread_attr_init(&attr);
 	
+	/* Process command line arguments */
 	for (i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "-m") == 0) {
+		if (strcmp(argv[i], "-a") == 0) {
+			/* Force the CPU affinity of benchmark threads */
+			arg_force_affinity = 1;
+		}
+		else if (strcmp(argv[i], "-b") == 0) {
+			/* Use either 64-bit integers or double-precision floating point */
+			arg_use_64bit_numbers = 1;
+		}
+		else if (strcmp(argv[i], "-m") == 0) {
+			/* Measure timing, performance and power consumption */
 			arg_do_measure = 1;
 		}
 		else if (strcmp(argv[i], "-n") == 0) {
+			/* Multiply the running time of micro benchmarks by a given factor */
 			if (i + 1 < argc) {
 				i++;
 				arg_multiplier = atoi(argv[i]);
 				bench->ntimes *= arg_multiplier;
 			}
 		}
-		else if (strcmp(argv[i], "-b") == 0) {
-			arg_use_64bit_numbers = 1;
-		}
 		else if (strcmp(argv[i], "-p") == 0) {
+			/* Only execute a specific benchmark phase (warmup = 0, normal = 1, or extreme = 2) */
 			if (i + 1 < argc) {
 				i++;
 				arg_benchmark_phase = atoi(argv[i]);
 			}
 		}
-		else if (strcmp(argv[i], "-t") == 0) {
-			if (i + 1 < argc) {
-				i++;
-				arg_num_threads = atoi(argv[i]);
-			}
-		}
 		else if (strcmp(argv[i], "-r") == 0) {
+			/* Number of times to repeat */
 			if (i + 1 < argc) {
 				i++;
 				arg_num_repeat = atoi(argv[i]);
 			}
 		}
+		else if (strcmp(argv[i], "-t") == 0) {
+			/* Number of threads */
+			if (i + 1 < argc) {
+				i++;
+				arg_num_threads = atoi(argv[i]);
+			}
+		}
 		else if (strcmp(argv[i], "-w") == 0) {
+			/* Warmup time in seconds */
 			if (i + 1 < argc) {
 				i++;
 				arg_warmup_time = atoi(argv[i]);
@@ -875,6 +912,10 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 			fprintf(stderr, "Error: Unrecognized option \"%s\".\n", argv[i]);
 			exit(EXIT_FAILURE);
 		}
+	}
+	
+	if (arg_force_affinity) {
+		attrp = &attr;
 	}
 	
 	if (arg_do_measure) {
@@ -935,7 +976,8 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		for (i = 0; i < arg_num_threads; i++) {
 			targs[i].benchmark = bench->warmup;
 			targs[i].ntimes = bench->ntimes;
-			rval = pthread_create(&targs[i].thread_id, NULL, measure_benchmark_thread, &targs[i]);
+			measure_set_thread_affinity(attrp, i);
+			rval = pthread_create(&targs[i].thread_id, attrp, measure_benchmark_thread, &targs[i]);
 			if (rval != 0) {
 				fprintf(stderr, "Error: pthread_create failed (rval = %d)!\n", rval);
 				exit(EXIT_FAILURE);
@@ -960,7 +1002,8 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 			/* Launch threads again */
 			for (i = 0; i < arg_num_threads; i++) {
 				targs[i].ntimes *= ntimes_scale_factor;
-				rval = pthread_create(&targs[i].thread_id, NULL, measure_benchmark_thread, &targs[i]);
+				measure_set_thread_affinity(attrp, i);
+				rval = pthread_create(&targs[i].thread_id, attrp, measure_benchmark_thread, &targs[i]);
 				if (rval != 0) {
 					fprintf(stderr, "Error: pthread_create failed (rval = %d)!\n", rval);
 					exit(EXIT_FAILURE);
@@ -984,8 +1027,8 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	// Print CSV-output column names
 	if (arg_num_repeat > 1) {
 		printf("num_threads"
-		       ",time_elapsed_normal,uops_issued_normal,idq_mite_normal,pkg_power_normal,pp0_power_normal"
-		       ",time_elapsed_extreme,uops_issued_extreme,idq_mite_extreme,pkg_power_extreme,pp0_power_extreme"
+		       ",time_elapsed_normal,uops_issued_normal,idq_mite_normal,pkg_power_normal,pp0_power_normal,pkg_temp_normal"
+		       ",time_elapsed_extreme,uops_issued_extreme,idq_mite_extreme,pkg_power_extreme,pp0_power_extreme,pkg_temp_extreme"
 		       "\n");
 		fflush(stdout);
 	}
@@ -1012,7 +1055,8 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 			for (i = 0; i < arg_num_threads; i++) {
 				targs[i].benchmark = bench->normal;
 				targs[i].ntimes = bench->ntimes;
-				rval = pthread_create(&targs[i].thread_id, NULL, measure_benchmark_thread, &targs[i]);
+				measure_set_thread_affinity(attrp, i);
+				rval = pthread_create(&targs[i].thread_id, attrp, measure_benchmark_thread, &targs[i]);
 				if (rval != 0) {
 					fprintf(stderr, "Error: pthread_create failed (rval = %d)!\n", rval);
 					exit(EXIT_FAILURE);
@@ -1036,7 +1080,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 				time_elapsed_normal = measure_state.time_elapsed_before;
 				uops_issued_normal = measure_state.event_1_before;
 				idq_mite_uops_normal = measure_state.event_2_before;
-				pkg_temp_normal = measure_state.end_temp_pkg;
+				pkg_temp_normal = measure_state.end_temp_pkg; /* sample pkg temperature at the end */
 			}
 		}
 		
@@ -1053,7 +1097,8 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 			for (i = 0; i < arg_num_threads; i++) {
 				targs[i].benchmark = bench->extreme;
 				targs[i].ntimes = bench->ntimes;
-				rval = pthread_create(&targs[i].thread_id, NULL, measure_benchmark_thread, &targs[i]);
+				measure_set_thread_affinity(attrp, i);
+				rval = pthread_create(&targs[i].thread_id, attrp, measure_benchmark_thread, &targs[i]);
 				if (rval != 0) {
 					fprintf(stderr, "Error: pthread_create failed (rval = %d)!\n", rval);
 					exit(EXIT_FAILURE);
@@ -1077,17 +1122,17 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 				time_elapsed_extreme = measure_state.time_elapsed_before;
 				uops_issued_extreme = measure_state.event_1_before;
 				idq_mite_uops_extreme = measure_state.event_2_before;
-				pkg_temp_extreme = measure_state.end_temp_pkg;
+				pkg_temp_extreme = measure_state.end_temp_pkg; /* sample pkg temperature at the end */
 			}
 		}
 		
 		/* Print compact power consumption numbers when repeating multiple times */
 		if (arg_num_repeat > 1) {
-			printf("%d,%f,%.0f,%.0f,%f,%f,%f,%.0f,%.0f,%f,%f\n", arg_num_threads,
+			printf("%d,%f,%.0f,%.0f,%f,%f,%.0f,%f,%.0f,%.0f,%f,%f,%.0f\n", arg_num_threads,
 			       time_elapsed_normal, uops_issued_normal, idq_mite_uops_normal,
-			       pkg_power_normal, pp0_power_normal,
+			       pkg_power_normal, pp0_power_normal, pkg_temp_normal,
 			       time_elapsed_extreme, uops_issued_extreme, idq_mite_uops_extreme,
-			       pkg_power_extreme, pp0_power_extreme);
+			       pkg_power_extreme, pp0_power_extreme, pkg_temp_extreme);
 			fflush(stdout);
 		}
 	}
@@ -1100,6 +1145,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	/* Clean up */
 	if (arg_do_measure) measure_cleanup(&measure_state);
 	free(targs);
+	pthread_attr_destroy(&attr);
 	
 	/* Success */
 	return EXIT_SUCCESS;
