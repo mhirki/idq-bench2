@@ -1,6 +1,10 @@
 #!/usr/bin/php
 <?php
 
+/*
+ * Run all benchmarks in the current directory. Can be used for nightly runs.
+ */
+
 $initial_warmup_time = 240; // in seconds
 $warmup_time = 120; // in seconds
 $repeat_count = 100;
@@ -21,6 +25,7 @@ function discover_benchmarks() {
 	$benchmarks = array();
 	
 	foreach ($files as $file) {
+		// All executable files except for .php scripts
 		if (is_file($file) && is_executable($file) && substr($file, -4) !== ".php") {
 			$benchmarks[] = $file;
 		}
