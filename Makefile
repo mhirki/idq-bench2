@@ -18,14 +18,14 @@ BINARY_TARGETS = idq-bench-float-addmul idq-bench-float-array-l1-addmul idq-benc
 
 all: $(BINARY_TARGETS)
 
-.PHONY: clean
+.PHONY: clean all
 
 clean:
 	rm -f $(BINARY_TARGETS) measure-util.o
 
-measure-util.o: measure-util.c
+measure-util.o: measure-util.c measure-util.h
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 # Implicit rule for making executable binaries
-%: %.c measure-util.o
+%: %.c measure-util.o measure-util.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< measure-util.o $(LIBS)
