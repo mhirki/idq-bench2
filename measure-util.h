@@ -147,7 +147,6 @@ typedef struct {
 
 typedef struct {
 	int (*init)(void **benchdata);
-	int (*warmup)(void *benchdata, long ntimes);
 	int (*normal)(void *benchdata, long ntimes);
 	int (*extreme)(void *benchdata, long ntimes);
 	int (*cleanup)(void *benchdata);

@@ -46,18 +46,6 @@ typedef double kernel_data_t;
 /*
  * Benchmark kernels
  */
-kernel_data_t kernel_warmup(long ntimes, kernel_data_t a, kernel_data_t b) {
-	(void)b;
-	long i = 0, j = 0;
-	kernel_data_t sum = 0;
-	for (i = 0; i < ntimes; i++) {
-		for (j = 0; j < ARRAY_SIZE;) {
-			ADD_128
-		}
-	}
-	return sum;
-}
-
 kernel_data_t kernel_normal(long ntimes, kernel_data_t a, kernel_data_t b) {
 	(void)b;
 	long i = 0, j = 0;
@@ -97,11 +85,6 @@ static int bench_init(void **benchdata) {
 	return 1;
 }
 
-static int bench_warmup(void *benchdata, long ntimes) {
-	benchdata_t *data = benchdata;
-	return kernel_warmup(ntimes, data->a, data->b);
-}
-
 static int bench_normal(void *benchdata, long ntimes) {
 	benchdata_t *data = benchdata;
 	return kernel_normal(ntimes, data->a, data->b);
@@ -127,7 +110,6 @@ int main(int argc, char **argv) {
 	/* Set up benchmark parameters */
 	bench.ntimes = NTIMES;
 	bench.init = bench_init;
-	bench.warmup = bench_warmup;
 	bench.normal = bench_normal;
 	bench.extreme = bench_extreme;
 	bench.cleanup = bench_cleanup;

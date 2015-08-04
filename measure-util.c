@@ -834,6 +834,71 @@ static void measure_set_thread_affinity(pthread_attr_t *attr, int thread_num) {
 	}
 }
 
+static void phase_warmup(measure_benchmark_t *bench, char quiet_mode, int (*warmup_func)(void *, long), thread_args_t *targs, pthread_attr_t *attrp) {
+	long i = 0;
+	int rval = 0;
+	void *thread_result = NULL;
+	
+	/* Warmup phase */
+	if ((arg_benchmark_phase == -1 || arg_benchmark_phase == 0) && arg_warmup_time > 0) {
+		if (!quiet_mode) {
+			printf("Running warmup for estimated %d seconds.\n", arg_warmup_time);
+			fflush(stdout);
+		}
+		double warmup_start = gettimeofday_double();
+		/* Calibration with the default ntimes value */
+		for (i = 0; i < arg_num_threads; i++) {
+			targs[i].benchmark = warmup_func;
+			targs[i].ntimes = bench->ntimes;
+			measure_set_thread_affinity(attrp, i);
+			rval = pthread_create(&targs[i].thread_id, attrp, measure_benchmark_thread, &targs[i]);
+			if (rval != 0) {
+				fprintf(stderr, "Error: pthread_create failed (rval = %d)!\n", rval);
+				exit(EXIT_FAILURE);
+			}
+		}
+		for (i = 0; i < arg_num_threads; i++) {
+			rval = pthread_join(targs[i].thread_id, &thread_result);
+			if (rval != 0) {
+				fprintf(stderr, "Warning: pthread_join failed (rval = %d)!\n", rval);
+			}
+			if (arg_do_measure) measure_cleanup(&targs[i].measure_state);
+		}
+		double warmup_calibration_end = gettimeofday_double();
+		double warmup_calibration_duration = warmup_calibration_end - warmup_start;
+		if (!quiet_mode) {
+			printf("Warmup calibration of %ld iterations completed in %f seconds.\n", bench->ntimes, warmup_calibration_duration);
+			fflush(stdout);
+		}
+		/* Estimate for ntimes to reach the requested warmup time */
+		double ntimes_scale_factor = (arg_warmup_time - warmup_calibration_duration) / warmup_calibration_duration;
+		if (ntimes_scale_factor > 0) {
+			/* Launch threads again */
+			for (i = 0; i < arg_num_threads; i++) {
+				targs[i].ntimes *= ntimes_scale_factor;
+				measure_set_thread_affinity(attrp, i);
+				rval = pthread_create(&targs[i].thread_id, attrp, measure_benchmark_thread, &targs[i]);
+				if (rval != 0) {
+					fprintf(stderr, "Error: pthread_create failed (rval = %d)!\n", rval);
+					exit(EXIT_FAILURE);
+				}
+			}
+			for (i = 0; i < arg_num_threads; i++) {
+				rval = pthread_join(targs[i].thread_id, &thread_result);
+				if (rval != 0) {
+					fprintf(stderr, "Warning: pthread_join failed (rval = %d)!\n", rval);
+				}
+				if (arg_do_measure) measure_cleanup(&targs[i].measure_state);
+			}
+		}
+		double warmup_end = gettimeofday_double();
+		if (!quiet_mode) {
+			printf("Warmup complete in %f seconds.\n", warmup_end - warmup_start);
+			fflush(stdout);
+		}
+	}
+}
+
 /*
  * Parsed command line parameters
  */
@@ -950,7 +1015,6 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	/* Pre-warmup of all the benchmark hook functions */
 	void *pre_warmup_benchdata = NULL;
 	bench->init(&pre_warmup_benchdata);
-	bench->warmup(pre_warmup_benchdata, 0);
 	bench->normal(pre_warmup_benchdata, 0);
 	bench->extreme(pre_warmup_benchdata, 0);
 	bench->cleanup(pre_warmup_benchdata);
@@ -965,65 +1029,6 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		targs[i].do_measure = arg_do_measure;
 	}
 	
-	/* Warmup phase */
-	if ((arg_benchmark_phase == -1 || arg_benchmark_phase == 0) && arg_warmup_time > 0) {
-		if (!quiet_mode) {
-			printf("Running warmup for estimated %d seconds.\n", arg_warmup_time);
-			fflush(stdout);
-		}
-		double warmup_start = gettimeofday_double();
-		/* Calibration with the default ntimes value */
-		for (i = 0; i < arg_num_threads; i++) {
-			targs[i].benchmark = bench->warmup;
-			targs[i].ntimes = bench->ntimes;
-			measure_set_thread_affinity(attrp, i);
-			rval = pthread_create(&targs[i].thread_id, attrp, measure_benchmark_thread, &targs[i]);
-			if (rval != 0) {
-				fprintf(stderr, "Error: pthread_create failed (rval = %d)!\n", rval);
-				exit(EXIT_FAILURE);
-			}
-		}
-		for (i = 0; i < arg_num_threads; i++) {
-			rval = pthread_join(targs[i].thread_id, &thread_result);
-			if (rval != 0) {
-				fprintf(stderr, "Warning: pthread_join failed (rval = %d)!\n", rval);
-			}
-			if (arg_do_measure) measure_cleanup(&targs[i].measure_state);
-		}
-		double warmup_calibration_end = gettimeofday_double();
-		double warmup_calibration_duration = warmup_calibration_end - warmup_start;
-		if (!quiet_mode) {
-			printf("Warmup calibration of %ld iterations completed in %f seconds.\n", bench->ntimes, warmup_calibration_duration);
-			fflush(stdout);
-		}
-		/* Estimate for ntimes to reach the requested warmup time */
-		double ntimes_scale_factor = (arg_warmup_time - warmup_calibration_duration) / warmup_calibration_duration;
-		if (ntimes_scale_factor > 0) {
-			/* Launch threads again */
-			for (i = 0; i < arg_num_threads; i++) {
-				targs[i].ntimes *= ntimes_scale_factor;
-				measure_set_thread_affinity(attrp, i);
-				rval = pthread_create(&targs[i].thread_id, attrp, measure_benchmark_thread, &targs[i]);
-				if (rval != 0) {
-					fprintf(stderr, "Error: pthread_create failed (rval = %d)!\n", rval);
-					exit(EXIT_FAILURE);
-				}
-			}
-			for (i = 0; i < arg_num_threads; i++) {
-				rval = pthread_join(targs[i].thread_id, &thread_result);
-				if (rval != 0) {
-					fprintf(stderr, "Warning: pthread_join failed (rval = %d)!\n", rval);
-				}
-				if (arg_do_measure) measure_cleanup(&targs[i].measure_state);
-			}
-		}
-		double warmup_end = gettimeofday_double();
-		if (!quiet_mode) {
-			printf("Warmup complete in %f seconds.\n", warmup_end - warmup_start);
-			fflush(stdout);
-		}
-	}
-	
 	// Print CSV-output column names
 	if (arg_num_repeat > 1) {
 		printf("num_threads"
@@ -1033,17 +1038,24 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		fflush(stdout);
 	}
 	
-	/* Repeat requested number of times */
-	for (j = 0; j < arg_num_repeat; j++) {
-		double pkg_power_normal = 0, pp0_power_normal = 0;
-		double pkg_power_extreme = 0, pp0_power_extreme = 0;
-		double time_elapsed_normal = 0, time_elapsed_extreme = 0;
-		double uops_issued_normal = 0, uops_issued_extreme = 0;
-		double idq_mite_uops_normal = 0, idq_mite_uops_extreme = 0;
-		double pkg_temp_normal = 0, pkg_temp_extreme = 0;
-		
-		/* Normal version */
-		if (arg_benchmark_phase == -1 || arg_benchmark_phase == 1) {
+	/* Buffers for storing repeated measurements */
+	const long buffer_size = arg_num_repeat * sizeof(double);
+	double *pkg_power_normal = measure_alloc(buffer_size), *pp0_power_normal = measure_alloc(buffer_size);
+	double *pkg_power_extreme = measure_alloc(buffer_size), *pp0_power_extreme = measure_alloc(buffer_size);
+	double *time_elapsed_normal = measure_alloc(buffer_size), *time_elapsed_extreme = measure_alloc(buffer_size);
+	double *uops_issued_normal = measure_alloc(buffer_size), *uops_issued_extreme = measure_alloc(buffer_size);
+	double *idq_mite_uops_normal = measure_alloc(buffer_size), *idq_mite_uops_extreme = measure_alloc(buffer_size);
+	double *pkg_temp_normal = measure_alloc(buffer_size), *pkg_temp_extreme = measure_alloc(buffer_size);
+	
+	/* Warmup for normal version */
+	if (arg_benchmark_phase == -1 || arg_benchmark_phase == 1) {
+		phase_warmup(bench, quiet_mode, bench->normal, targs, attrp);
+	}
+	
+	/* Normal version */
+	if (arg_benchmark_phase == -1 || arg_benchmark_phase == 2) {
+		/* Repeat requested number of times */
+		for (j = 0; j < arg_num_repeat; j++) {
 			if (!quiet_mode) {
 				printf("\n");
 				printf("========================================================================\n");
@@ -1075,17 +1087,30 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 					measure_cleanup(&targs[i].measure_state);
 				}
 				measure_print(&measure_state, measure_flags);
-				pkg_power_normal = measure_state.pkg_power_before;
-				pp0_power_normal = measure_state.pp0_power_before;
-				time_elapsed_normal = measure_state.time_elapsed_before;
-				uops_issued_normal = measure_state.event_1_before;
-				idq_mite_uops_normal = measure_state.event_2_before;
-				pkg_temp_normal = measure_state.end_temp_pkg; /* sample pkg temperature at the end */
+				pkg_power_normal[j] = measure_state.pkg_power_before;
+				pp0_power_normal[j] = measure_state.pp0_power_before;
+				time_elapsed_normal[j] = measure_state.time_elapsed_before;
+				uops_issued_normal[j] = measure_state.event_1_before;
+				idq_mite_uops_normal[j] = measure_state.event_2_before;
+				pkg_temp_normal[j] = measure_state.end_temp_pkg; /* sample pkg temperature at the end */
 			}
 		}
-		
-		/* Extreme unrolled version */
-		if (arg_benchmark_phase == -1 || arg_benchmark_phase == 2) {
+	}
+	
+	/* Warmup for extreme version */
+	if (arg_benchmark_phase == -1 || arg_benchmark_phase == 3) {
+		if (!quiet_mode) {
+			printf("\n");
+			printf("========================================================================\n");
+			printf("\n");
+		}
+		phase_warmup(bench, quiet_mode, bench->extreme, targs, attrp);
+	}
+	
+	/* Extreme unrolled version */
+	if (arg_benchmark_phase == -1 || arg_benchmark_phase == 4) {
+		/* Repeat requested number of times */
+		for (j = 0; j < arg_num_repeat; j++) {
 			if (!quiet_mode) {
 				printf("\n");
 				printf("========================================================================\n");
@@ -1117,24 +1142,26 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 					measure_cleanup(&targs[i].measure_state);
 				}
 				measure_print(&measure_state, measure_flags);
-				pkg_power_extreme = measure_state.pkg_power_before;
-				pp0_power_extreme = measure_state.pp0_power_before;
-				time_elapsed_extreme = measure_state.time_elapsed_before;
-				uops_issued_extreme = measure_state.event_1_before;
-				idq_mite_uops_extreme = measure_state.event_2_before;
-				pkg_temp_extreme = measure_state.end_temp_pkg; /* sample pkg temperature at the end */
+				pkg_power_extreme[j] = measure_state.pkg_power_before;
+				pp0_power_extreme[j] = measure_state.pp0_power_before;
+				time_elapsed_extreme[j] = measure_state.time_elapsed_before;
+				uops_issued_extreme[j] = measure_state.event_1_before;
+				idq_mite_uops_extreme[j] = measure_state.event_2_before;
+				pkg_temp_extreme[j] = measure_state.end_temp_pkg; /* sample pkg temperature at the end */
 			}
 		}
-		
-		/* Print compact power consumption numbers when repeating multiple times */
-		if (arg_num_repeat > 1) {
+	}
+	
+	/* Print compact power consumption numbers when repeating multiple times */
+	if (arg_num_repeat > 1) {
+		for (j = 0; j < arg_num_repeat; j++) {
 			printf("%d,%f,%.0f,%.0f,%f,%f,%.0f,%f,%.0f,%.0f,%f,%f,%.0f\n", arg_num_threads,
-			       time_elapsed_normal, uops_issued_normal, idq_mite_uops_normal,
-			       pkg_power_normal, pp0_power_normal, pkg_temp_normal,
-			       time_elapsed_extreme, uops_issued_extreme, idq_mite_uops_extreme,
-			       pkg_power_extreme, pp0_power_extreme, pkg_temp_extreme);
-			fflush(stdout);
+				time_elapsed_normal[j], uops_issued_normal[j], idq_mite_uops_normal[j],
+				pkg_power_normal[j], pp0_power_normal[j], pkg_temp_normal[j],
+				time_elapsed_extreme[j], uops_issued_extreme[j], idq_mite_uops_extreme[j],
+				pkg_power_extreme[j], pp0_power_extreme[j], pkg_temp_extreme[j]);
 		}
+		fflush(stdout);
 	}
 	
 	/* Call cleanup hook for every thread structure */
@@ -1143,6 +1170,18 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	}
 	
 	/* Clean up */
+	free(pkg_power_normal);
+	free(pp0_power_normal);
+	free(pkg_power_extreme);
+	free(pp0_power_extreme);
+	free(time_elapsed_normal);
+	free(time_elapsed_extreme);
+	free(uops_issued_normal);
+	free(uops_issued_extreme);
+	free(idq_mite_uops_normal);
+	free(idq_mite_uops_extreme);
+	free(pkg_temp_normal);
+	free(pkg_temp_extreme);
 	if (arg_do_measure) measure_cleanup(&measure_state);
 	free(targs);
 	pthread_attr_destroy(&attr);

@@ -46,17 +46,6 @@ typedef unsigned long long kernel_data_t;
 /*
  * Benchmark kernels
  */
-kernel_data_t kernel_warmup(long ntimes) {
-	long i = 0, j = 0;
-	kernel_data_t magic = 0, magic2 = 0;
-	for (i = 0; i < ntimes; i++) {
-		for (j = 0; j < ARRAY_SIZE;) {
-			ADD_128
-		}
-	}
-	return magic + magic2;
-}
-
 kernel_data_t kernel_normal(long ntimes) {
 	long i = 0, j = 0;
 	kernel_data_t magic = 0, magic2 = 0;
@@ -91,11 +80,6 @@ static int bench_init(void **benchdata) {
 	return 1;
 }
 
-static int bench_warmup(void *benchdata, long ntimes) {
-	(void)benchdata;
-	return kernel_warmup(ntimes);
-}
-
 static int bench_normal(void *benchdata, long ntimes) {
 	(void)benchdata;
 	return kernel_normal(ntimes);
@@ -121,7 +105,6 @@ int main(int argc, char **argv) {
 	/* Set up benchmark parameters */
 	bench.ntimes = NTIMES;
 	bench.init = bench_init;
-	bench.warmup = bench_warmup;
 	bench.normal = bench_normal;
 	bench.extreme = bench_extreme;
 	bench.cleanup = bench_cleanup;
