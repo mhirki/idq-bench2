@@ -29,7 +29,7 @@
 /*
  * Loop enough times to make the power consumption measurable.
  */
-#define NTIMES		160000
+#define NTIMES		129000
 
 /*
  * Data type used in the benchmark kernels.
