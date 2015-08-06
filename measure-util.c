@@ -842,7 +842,7 @@ static void phase_warmup(measure_benchmark_t *bench, char quiet_mode, int (*warm
 	void *thread_result = NULL;
 	
 	/* Warmup phase */
-	if ((arg_benchmark_phase == -1 || arg_benchmark_phase == 0) && arg_warmup_time > 0) {
+	if (arg_warmup_time > 0) {
 		if (!quiet_mode) {
 			printf("Running warmup for estimated %d seconds.\n", arg_warmup_time);
 			fflush(stdout);
