@@ -209,7 +209,9 @@ int measure_init_papi(int flags) {
 		running_as_root = 1;
 	} else {
 		running_as_root = 0;
-		fprintf(stderr, "Warning: Not running as root, some functionality will be disabled.\n");
+		if (!(flags & MEASURE_FLAG_NO_PRINT)) {
+			fprintf(stderr, "Warning: Not running as root, some functionality will be disabled.\n");
+		}
 	}
 	
 	if (running_as_root) {
@@ -983,17 +985,6 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		attrp = &attr;
 	}
 	
-	if (arg_do_measure) {
-		if (!measure_init_papi(0)) {
-			fprintf(stderr, "Warning: measure_init_papi failed, disabling measurements.\n");
-			arg_do_measure = 0;
-		}
-		if (!measure_init_thread(&measure_state, 0)) {
-			fprintf(stderr, "Warning: measure_init_thread failed, disabling measurements.\n");
-			arg_do_measure = 0;
-		}
-	}
-	
 	/* Seed random number generator with a constant seed to make the result reproducible */
 	srand(0xdeadbeef);
 	
@@ -1003,6 +994,17 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	}
 	if (quiet_mode) {
 		measure_flags |= MEASURE_FLAG_NO_PRINT;
+	}
+	
+	if (arg_do_measure) {
+		if (!measure_init_papi(measure_flags)) {
+			fprintf(stderr, "Warning: measure_init_papi failed, disabling measurements.\n");
+			arg_do_measure = 0;
+		}
+		if (!measure_init_thread(&measure_state, measure_flags)) {
+			fprintf(stderr, "Warning: measure_init_thread failed, disabling measurements.\n");
+			arg_do_measure = 0;
+		}
 	}
 	
 	/* Allocate data structures for threads */
