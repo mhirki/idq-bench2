@@ -62,7 +62,7 @@ kernel_data_t kernel_extreme(long ntimes) {
 	kernel_data_t magic = 0, magic2 = 0, magic3 = 0;
 	for (i = 0; i < ntimes; i++) {
 		for (j = 0; j < ARRAY_SIZE;) {
-			ADD_1024
+			ADD_256
 		}
 	}
 	return magic + magic2 + magic3;

@@ -58,7 +58,7 @@ kernel_data_t kernel_normal(long ntimes, kernel_data_t *a, kernel_data_t scalar)
 	kernel_data_t sum = 0;
 	for (i = 0; i < ntimes; i++) {
 		for (j = 0; j < ARRAY_SIZE;) {
-			ADD_128
+			ADD_256
 		}
 	}
 	return sum;
@@ -69,7 +69,7 @@ kernel_data_t kernel_extreme(long ntimes, kernel_data_t *a, kernel_data_t scalar
 	kernel_data_t sum = 0;
 	for (i = 0; i < ntimes; i++) {
 		for (j = 0; j < ARRAY_SIZE;) {
-			ADD_1024
+			ADD_512
 		}
 	}
 	return sum;

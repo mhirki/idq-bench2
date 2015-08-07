@@ -17,12 +17,12 @@
 /*
  * Number of inner loop iterations.
  */
-#define ARRAY_SIZE	1024
+#define ARRAY_SIZE	2048
 
 /*
  * Loop enough times to make the power consumption measurable.
  */
-#define NTIMES		1213000
+#define NTIMES		606000
 
 /*
  * Data type used in the benchmark kernels.
