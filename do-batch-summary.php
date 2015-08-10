@@ -5,7 +5,7 @@
  * Create a summary from multiple CSV files produced by micro benchmarks.
  */
 
-$extract_columns = array('idq_mite_normal', 'pkg_power_normal', 'idq_mite_extreme', 'pkg_power_extreme');
+$extract_columns = array('uops_issued_normal', 'idq_mite_normal', 'pkg_power_normal', 'uops_issued_extreme', 'idq_mite_extreme', 'pkg_power_extreme');
 
 if ($argc > 1) {
 	if ($argv[1] == "-h" || $argv[1] == "--help") {
