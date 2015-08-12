@@ -26,7 +26,7 @@ function discover_benchmarks() {
 	
 	foreach ($files as $file) {
 		// All executable files except for .php scripts
-		if (is_file($file) && is_executable($file) && substr($file, -4) !== ".php") {
+		if (is_file($file) && is_executable($file) && substr($file, -4) !== ".php" && substr($file, -3) !== ".sh") {
 			$benchmarks[] = $file;
 		}
 	}
