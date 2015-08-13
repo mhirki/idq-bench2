@@ -801,11 +801,25 @@ void *measure_aligned_alloc(size_t size, size_t alignment) {
 typedef struct {
 	pthread_t thread_id;
 	int (*benchmark)(void *benchdata, long ntimes);
+	int (*init)(void **benchdata);
 	void *benchdata;
 	long ntimes;
 	measure_state_t measure_state;
 	char do_measure;
 } thread_args_t;
+
+
+/*
+ * Initialization thread function
+ */
+static void *measure_benchmark_init_thread(void *arg) {
+	thread_args_t *args = (thread_args_t *) arg;
+	if (!args->init(&args->benchdata)) {
+		fprintf(stderr, "Error: Benchmark initialization hook function failed!\n");
+		exit(EXIT_FAILURE);
+	}
+	return NULL;
+}
 
 /*
  * Worker thread function
@@ -1016,19 +1030,23 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	
 	/* Pre-warmup of all the benchmark hook functions */
 	void *pre_warmup_benchdata = NULL;
-	bench->init(&pre_warmup_benchdata);
+	if (!bench->init(&pre_warmup_benchdata)) {
+		fprintf(stderr, "Error: Benchmark initialization hook function failed!\n");
+		exit(EXIT_FAILURE);
+	}
 	bench->normal(pre_warmup_benchdata, 0);
 	bench->extreme(pre_warmup_benchdata, 0);
 	bench->cleanup(pre_warmup_benchdata);
 	
 	/* Call initialization hook for every thread structure */
 	for (i = 0; i < arg_num_threads; i++) {
-		if (!bench->init(&targs[i].benchdata)) {
-			fprintf(stderr, "Error: Benchmark initialization hook function failed!\n");
-			exit(EXIT_FAILURE);
-		}
 		/* Copy arguments */
 		targs[i].do_measure = arg_do_measure;
+		targs[i].init = bench->init;
+		rval = pthread_create(&targs[i].thread_id, NULL, measure_benchmark_init_thread, &targs[i]);
+	}
+	for (i = 0; i < arg_num_threads; i++) {
+		rval = pthread_join(targs[i].thread_id, &thread_result);
 	}
 	
 	// Print CSV-output column names
@@ -1041,13 +1059,23 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	}
 	
 	/* Buffers for storing repeated measurements */
-	const long buffer_size = arg_num_repeat * sizeof(double);
-	double *pkg_power_normal = measure_alloc(buffer_size), *pp0_power_normal = measure_alloc(buffer_size);
-	double *pkg_power_extreme = measure_alloc(buffer_size), *pp0_power_extreme = measure_alloc(buffer_size);
-	double *time_elapsed_normal = measure_alloc(buffer_size), *time_elapsed_extreme = measure_alloc(buffer_size);
-	double *uops_issued_normal = measure_alloc(buffer_size), *uops_issued_extreme = measure_alloc(buffer_size);
-	double *idq_mite_uops_normal = measure_alloc(buffer_size), *idq_mite_uops_extreme = measure_alloc(buffer_size);
-	double *pkg_temp_normal = measure_alloc(buffer_size), *pkg_temp_extreme = measure_alloc(buffer_size);
+	double *pkg_power_normal = NULL, *pp0_power_normal = NULL;
+	double *pkg_power_extreme = NULL, *pp0_power_extreme = NULL;
+	double *time_elapsed_normal = NULL, *time_elapsed_extreme = NULL;
+	double *uops_issued_normal = NULL, *uops_issued_extreme = NULL;
+	double *idq_mite_uops_normal = NULL, *idq_mite_uops_extreme = NULL;
+	double *pkg_temp_normal = NULL, *pkg_temp_extreme = NULL;
+	
+	/* Allocate buffers */
+	if (arg_do_measure) {
+		const long buffer_size = arg_num_repeat * sizeof(double);
+		pkg_power_normal = measure_alloc(buffer_size), pp0_power_normal = measure_alloc(buffer_size);
+		pkg_power_extreme = measure_alloc(buffer_size), pp0_power_extreme = measure_alloc(buffer_size);
+		time_elapsed_normal = measure_alloc(buffer_size), time_elapsed_extreme = measure_alloc(buffer_size);
+		uops_issued_normal = measure_alloc(buffer_size), uops_issued_extreme = measure_alloc(buffer_size);
+		idq_mite_uops_normal = measure_alloc(buffer_size), idq_mite_uops_extreme = measure_alloc(buffer_size);
+		pkg_temp_normal = measure_alloc(buffer_size), pkg_temp_extreme = measure_alloc(buffer_size);
+	}
 	
 	/* Warmup for normal version */
 	if (arg_benchmark_phase == -1 || arg_benchmark_phase == 1) {
@@ -1172,19 +1200,21 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	}
 	
 	/* Clean up */
-	free(pkg_power_normal);
-	free(pp0_power_normal);
-	free(pkg_power_extreme);
-	free(pp0_power_extreme);
-	free(time_elapsed_normal);
-	free(time_elapsed_extreme);
-	free(uops_issued_normal);
-	free(uops_issued_extreme);
-	free(idq_mite_uops_normal);
-	free(idq_mite_uops_extreme);
-	free(pkg_temp_normal);
-	free(pkg_temp_extreme);
-	if (arg_do_measure) measure_cleanup(&measure_state);
+	if (arg_do_measure) {
+		free(pkg_power_normal);
+		free(pp0_power_normal);
+		free(pkg_power_extreme);
+		free(pp0_power_extreme);
+		free(time_elapsed_normal);
+		free(time_elapsed_extreme);
+		free(uops_issued_normal);
+		free(uops_issued_extreme);
+		free(idq_mite_uops_normal);
+		free(idq_mite_uops_extreme);
+		free(pkg_temp_normal);
+		free(pkg_temp_extreme);
+		measure_cleanup(&measure_state);
+	}
 	free(targs);
 	pthread_attr_destroy(&attr);
 	
