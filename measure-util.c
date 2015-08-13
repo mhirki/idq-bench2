@@ -1028,16 +1028,6 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		exit(EXIT_FAILURE);
 	}
 	
-	/* Pre-warmup of all the benchmark hook functions */
-	void *pre_warmup_benchdata = NULL;
-	if (!bench->init(&pre_warmup_benchdata)) {
-		fprintf(stderr, "Error: Benchmark initialization hook function failed!\n");
-		exit(EXIT_FAILURE);
-	}
-	bench->normal(pre_warmup_benchdata, 0);
-	bench->extreme(pre_warmup_benchdata, 0);
-	bench->cleanup(pre_warmup_benchdata);
-	
 	/* Call initialization hook for every thread structure */
 	for (i = 0; i < arg_num_threads; i++) {
 		/* Copy arguments */
