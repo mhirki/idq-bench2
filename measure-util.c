@@ -1040,7 +1040,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	}
 	
 	// Print CSV-output column names
-	if (arg_num_repeat > 1) {
+	if (arg_do_measure && arg_num_repeat > 1) {
 		printf("num_threads"
 		       ",time_elapsed_normal,uops_issued_normal,idq_mite_normal,pkg_power_normal,pp0_power_normal,pkg_temp_normal"
 		       ",time_elapsed_extreme,uops_issued_extreme,idq_mite_extreme,pkg_power_extreme,pp0_power_extreme,pkg_temp_extreme"
@@ -1173,7 +1173,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	}
 	
 	/* Print compact power consumption numbers when repeating multiple times */
-	if (arg_num_repeat > 1) {
+	if (arg_do_measure && arg_num_repeat > 1) {
 		for (j = 0; j < arg_num_repeat; j++) {
 			printf("%d,%f,%.0f,%.0f,%f,%f,%.0f,%f,%.0f,%.0f,%f,%f,%.0f\n", arg_num_threads,
 				time_elapsed_normal[j], uops_issued_normal[j], idq_mite_uops_normal[j],
