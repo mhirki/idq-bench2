@@ -10,7 +10,27 @@
  * Compiler: gcc version 4.4.7 20120313 (Red Hat 4.4.7-11)
  * Compiler optimizations: -O2
  *
- * Author: Mikael Hirki <mikael.hirki@aalto.fi>
+ * Author: Mikael Hirki <mikael.hirki@gmail.com>
+ *
+ * Copyright (c) 2015 Helsinki Institute of Physics
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 /* Needed for setting CPU affinity */
@@ -92,16 +112,16 @@ pthread_mutex_t papi_mutex;
 static int open_msr(int core) {
 	char msr_filename[1024] = { '\0' };
 	int fd = -1;
-	
+
 	snprintf(msr_filename, sizeof(msr_filename), "/dev/cpu/%d/msr", core);
-	
+
 	fd = open(msr_filename, O_RDONLY);
 	if (fd < 0) {
 		perror("open");
 		fprintf(stderr, "open_msr failed while trying to open %s!\n", msr_filename);
 		return fd;
 	}
-	
+
 	return fd;
 }
 
@@ -114,7 +134,7 @@ static int read_msr(int fd, unsigned msr_offset, uint64_t *msr_out) {
 		fprintf(stderr, "read_msr failed while trying to read offset 0x%04x!\n", msr_offset);
 		return 0;
 	}
-	
+
 	/* Success */
 	return 1;
 }
@@ -124,7 +144,7 @@ static int read_msr(int fd, unsigned msr_offset, uint64_t *msr_out) {
  */
 static short read_temp(int fd, unsigned msr_offset) {
 	uint64_t msr_therm_status = 0;
-	
+
 	if (read_msr(fd, msr_offset, &msr_therm_status)) {
 		return tjmax - ((msr_therm_status >> 16) & 0x7f);
 	} else {
@@ -140,7 +160,7 @@ static short read_temp(int fd, unsigned msr_offset) {
 static double read_voltage(int fd) {
 	const double voltage_units = 0.0001220703125; // From Intel's manual: 1.0 / (2^13)
 	uint64_t msr_perf_status = 0;
-	
+
 	if (read_msr(fd, MSR_PERF_STATUS, &msr_perf_status)) {
 		unsigned voltage_raw = (msr_perf_status >> 32) & 0xFFFF;
 		return voltage_raw * voltage_units;
@@ -158,19 +178,19 @@ int measure_init_papi(int flags) {
 	/* Ignore flags */
 	(void)flags;
 	int code = 0;
-	
+
 	/* NOTE: PAPI_library_init gets stuck if called by multiple threads! */
 	if (PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT) {
 		fprintf(stderr, "Error: PAPI library initialisation failed.\n");
 		return 0;
 	}
-	
+
 	/* Initialize the PAPI thread support */
 	if (PAPI_thread_init(pthread_self) != PAPI_OK) {
 		fprintf(stderr, "Error: PAPI_thread_init failed.\n");
 		return 0;
 	}
-	
+
 	/* Cache event codes for faster performance. */
 	char *name = strdup(perf_event_1_name);
 	if (PAPI_event_name_to_code(name, &code) == PAPI_OK) {
@@ -200,10 +220,10 @@ int measure_init_papi(int flags) {
 		fprintf(stderr, "Warning: No such event found \"%s\"!\n", name);
 	}
 	free(name);
-	
+
 	/* Initialize the mutex used to protect some calls to PAPI functions */
 	pthread_mutex_init(&papi_mutex, NULL);
-	
+
 	/* Check whether we are running as root */
 	if (geteuid() == 0) {
 		running_as_root = 1;
@@ -213,13 +233,13 @@ int measure_init_papi(int flags) {
 			fprintf(stderr, "Warning: Not running as root, some functionality will be disabled.\n");
 		}
 	}
-	
+
 	if (running_as_root) {
 		core0_fd = open_msr(0);
 		core1_fd = open_msr(1);
 		core2_fd = open_msr(2);
 		core3_fd = open_msr(3);
-		
+
 		if (core0_fd >= 0) {
 			uint64_t msr_temp_target = 0;
 			if (read_msr(core0_fd, MSR_IA32_TEMPERATURE_TARGET, &msr_temp_target)) {
@@ -232,10 +252,10 @@ int measure_init_papi(int flags) {
 			}
 		}
 	}
-	
+
 	/* Update the number of CPUs available */
 	cpus_available = sysconf(_SC_NPROCESSORS_ONLN);
-	
+
 	/* Success */
 	return 1;
 }
@@ -256,7 +276,7 @@ int measure_init_thread(measure_state_t *state, int flags) {
 	int num_perf_events = 0;
 	char have_rapl = 1;
 	int rval = 0;
-	
+
 	/* Initialize the state structure */
 	memset(state, 0, sizeof(*state));
 	state->pkg_power_before = 0.0;
@@ -279,19 +299,19 @@ int measure_init_thread(measure_state_t *state, int flags) {
 	state->idx_event_2 = -1;
 	state->idx_event_3 = -1;
 	state->idx_event_4 = -1;
-	
+
 	PAPI_register_thread();
-	
+
 	/* Disable energy measurements if requested */
 	if (flags & MEASURE_FLAG_NO_ENERGY) {
 		have_rapl = 0;
 	}
-	
+
 	/* Disable energy measurements if not running as root */
 	if (!running_as_root) {
 		have_rapl = 0;
 	}
-	
+
 	/* Find the RAPL component of PAPI. */
 	int num_components = PAPI_num_components();
 	int component_id = 0;
@@ -311,20 +331,20 @@ int measure_init_thread(measure_state_t *state, int flags) {
 			have_rapl = 0;
 		}
 	}
-	
+
 	/* Create an event set. */
 	state->papi_energy_events = PAPI_NULL;
 	if ((rval = PAPI_create_eventset(&state->papi_energy_events)) != PAPI_OK) {
 		fprintf(stderr, "Error: PAPI_create_eventset failed (rval = %d)!\n", rval);
 		return 0;
 	}
-	
+
 	state->papi_perf_events = PAPI_NULL;
 	if ((rval = PAPI_create_eventset(&state->papi_perf_events)) != PAPI_OK) {
 		fprintf(stderr, "Error: PAPI_create_eventset failed (rval = %d)!\n", rval);
 		return 0;
 	}
-	
+
 	int code = PAPI_NATIVE_MASK;
 	if (have_rapl) {
 		int retval = 0;
@@ -334,7 +354,7 @@ int measure_init_thread(measure_state_t *state, int flags) {
 				fprintf(stderr, "Warning: Could not get PAPI event name.\n");
 				continue;
 			}
-			
+
 			PAPI_event_info_t event_info;
 			if (PAPI_get_event_info(code, &event_info) != PAPI_OK) {
 				fprintf(stderr, "Warning: Could not get PAPI event info.\n");
@@ -343,7 +363,7 @@ int measure_init_thread(measure_state_t *state, int flags) {
 			if (event_info.data_type != PAPI_DATATYPE_UINT64) {
 				continue;
 			}
-			
+
 			if (strstr(event_name, "PACKAGE_ENERGY:")) {
 				state->idx_pkg_energy = num_energy_events;
 			} else if (strstr(event_name, "PP0_ENERGY:")) {
@@ -355,7 +375,7 @@ int measure_init_thread(measure_state_t *state, int flags) {
 			} else {
 				continue; /* Skip other counters */
 			}
-			
+
 #ifdef DEBUG
 			printf("Adding %s to event set.\n", event_name);
 #endif
@@ -368,7 +388,7 @@ int measure_init_thread(measure_state_t *state, int flags) {
 			fprintf(stderr, "Warning: Could not find any RAPL events.\n");
 		}
 	}
-	
+
 	/* Fixed function performance counters */
 	if ((rval = PAPI_add_event(state->papi_perf_events, PAPI_TOT_CYC)) == PAPI_OK) {
 		state->idx_cycles = num_perf_events;
@@ -391,12 +411,12 @@ int measure_init_thread(measure_state_t *state, int flags) {
 	} else {
 		fprintf(stderr, "Warning: PAPI_add_event failed for PAPI_TOT_INS (code = %d, rval = %d)!\n", PAPI_TOT_INS, rval);
 	}
-	
+
 	/*
 	 * PAPI_add_event() seems to have issues with multiple threads...
 	 */
 	pthread_mutex_lock(&papi_mutex);
-	
+
 	/* Programmable counters */
 	if ((rval = PAPI_add_event(state->papi_perf_events, perf_event_1_code)) == PAPI_OK) {
 		state->idx_event_1 = num_perf_events;
@@ -422,24 +442,24 @@ int measure_init_thread(measure_state_t *state, int flags) {
 	} else {
 		fprintf(stderr, "PAPI_add_event failed for %s (rval = %d)!\n", perf_event_4_name, rval);
 	}
-	
+
 	/*
 	 * End of critical section...
 	 */
 	pthread_mutex_unlock(&papi_mutex);
-	
+
 	/* Store the numbers of events */
 	state->num_energy_events = num_energy_events;
 	state->num_perf_events = num_perf_events;
 	state->have_rapl = have_rapl;
-	
+
 	/* Allocate buffers for reading the event sets */
 	state->papi_energy_values = measure_alloc(num_energy_events * sizeof(*state->papi_energy_values));
 	state->papi_perf_values = measure_alloc(num_perf_events * sizeof(*state->papi_perf_values));
-	
+
 	/* Run the warmup */
 	measure_warmup(state);
-	
+
 	/* Success */
 	return 1;
 }
@@ -450,18 +470,18 @@ int measure_init_thread(measure_state_t *state, int flags) {
 int measure_start(measure_state_t *state, int flags) {
 	/* Ignore flags */
 	(void)flags;
-	
+
 	if (clock_gettime(CLOCK_REALTIME, &state->begin_time) < 0) {
 		perror("clock_gettime");
 	}
-	
+
 	/* Read the Time Stamp Counter value */
 	{
 		uint64_t tsc = 0;
 		RDTSC(tsc);
 		state->begin_tsc = tsc;
 	}
-	
+
 	/* Read temperatures and voltages */
 	if (core0_fd >= 0) {
 		state->begin_temp_pkg = read_temp(core0_fd, MSR_IA32_PACKAGE_THERM_STATUS);
@@ -480,7 +500,7 @@ int measure_start(measure_state_t *state, int flags) {
 		state->begin_temp3 = read_temp(core3_fd, MSR_IA32_THERM_STATUS);
 		state->begin_voltage3 = read_voltage(core3_fd);
 	}
-	
+
 	if (state->have_rapl) {
 		if (PAPI_start(state->papi_energy_events) == PAPI_OK) {
 			state->energy_started = 1;
@@ -488,13 +508,13 @@ int measure_start(measure_state_t *state, int flags) {
 			fprintf(stderr, "Warning: PAPI_start failed for the energy events!\n");
 		}
 	}
-	
+
 	if (PAPI_start(state->papi_perf_events) == PAPI_OK) {
 		state->perf_started = 1;
 	} else {
 		fprintf(stderr, "Warning: PAPI_start failed for the performance events!\n");
 	}
-	
+
 	/* Success */
 	return 1;
 }
@@ -505,18 +525,18 @@ int measure_start(measure_state_t *state, int flags) {
 int measure_stop(measure_state_t *state, int flags) {
 	/* Flags are ignored */
 	flags = flags;
-	
+
 	if (clock_gettime(CLOCK_REALTIME, &state->end_time) < 0) {
 		perror("clock_gettime");
 	}
-	
+
 	/* Read the Time Stamp Counter value */
 	{
 		uint64_t tsc = 0;
 		RDTSC(tsc);
 		state->end_tsc = tsc;
 	}
-	
+
 	/* Read temperatures and voltages */
 	if (core0_fd >= 0) {
 		state->end_temp_pkg = read_temp(core0_fd, MSR_IA32_PACKAGE_THERM_STATUS);
@@ -535,7 +555,7 @@ int measure_stop(measure_state_t *state, int flags) {
 		state->end_temp3 = read_temp(core3_fd, MSR_IA32_THERM_STATUS);
 		state->end_voltage3 = read_voltage(core3_fd);
 	}
-	
+
 	long long *papi_energy_values = state->papi_energy_values;
 	if (state->have_rapl) {
 		if (PAPI_stop(state->papi_energy_events, papi_energy_values) == PAPI_OK) {
@@ -544,14 +564,14 @@ int measure_stop(measure_state_t *state, int flags) {
 			fprintf(stderr, "Warning: PAPI_stop failed for the energy events!\n");
 		}
 	}
-	
+
 	long long *papi_perf_values = state->papi_perf_values;
 	if (PAPI_stop(state->papi_perf_events, papi_perf_values) == PAPI_OK) {
 		state->perf_started = 0;
 	} else {
 		fprintf(stderr, "Warning: PAPI_stop failed for the performance events!\n");
 	}
-	
+
 	/* Success */
 	return 1;
 }
@@ -562,17 +582,17 @@ int measure_stop(measure_state_t *state, int flags) {
 int measure_combine_perf_results(measure_state_t *this, measure_state_t *other) {
 	int i = 0;
 	int num_perf_events = this->num_perf_events;
-	
+
 	/* Sanity check */
 	if (num_perf_events != other->num_perf_events) {
 		fprintf(stderr, "Error: %s: Event sets don't contain the same number of events!\n", __func__);
 		return 0;
 	}
-	
+
 	for (i = 0; i < num_perf_events; i++) {
 		this->papi_perf_values[i] += other->papi_perf_values[i];
 	}
-	
+
 	/* Success */
 	return 1;
 }
@@ -587,10 +607,10 @@ int measure_print(measure_state_t *state, int flags) {
 	long long *papi_energy_values = state->papi_energy_values;
 	long long *papi_perf_values = state->papi_perf_values;
 	char print_results = !(flags & MEASURE_FLAG_NO_PRINT);
-	
+
 	double time_elapsed = (state->end_time.tv_sec - state->begin_time.tv_sec) + (state->end_time.tv_nsec - state->begin_time.tv_nsec) * 1e-9;
 	state->time_elapsed_before = time_elapsed;
-	
+
 	if (print_results) printf("Time elapsed: %12.6f seconds\n", time_elapsed);
 	/* Print the TSC value */
 	{
@@ -727,12 +747,12 @@ int measure_print(measure_state_t *state, int flags) {
 		printf("Spreadsheet dump: %.6f\t%.3fe6\t%.3fe6\t%.3fe6\t%.3fe6\t%.3fe6\t%.3f\t%.3f\n", time_elapsed, million_instructions_per_second, million_uops_per_second, million_idq_mite_uops_per_second, million_idq_dsb_uops_per_second, million_idq_ms_uops_per_second, pkg_power, pp0_power);
 	}
 #endif
-	
+
 	/* Flush the output (helps when outputting to a file) */
 	if (print_results) {
 		fflush(stdout);
 	}
-	
+
 	/* Success */
 	return 1;
 }
@@ -749,7 +769,7 @@ int measure_cleanup(measure_state_t *state) {
 	if (PAPI_cleanup_eventset(state->papi_perf_events) != PAPI_OK) {
 		fprintf(stderr, "Warning: PAPI_cleanup_eventset failed!\n");
 	}
-	
+
 	/* Success */
 	return 1;
 }
@@ -854,7 +874,7 @@ static void phase_warmup(measure_benchmark_t *bench, char quiet_mode, int (*warm
 	long i = 0;
 	int rval = 0;
 	void *thread_result = NULL;
-	
+
 	/* Warmup phase */
 	if (arg_warmup_time > 0) {
 		if (!quiet_mode) {
@@ -938,7 +958,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	memset(&measure_state, 0, sizeof(measure_state));
 	pthread_attr_t attr, *attrp = NULL;
 	pthread_attr_init(&attr);
-	
+
 	/* Process command line arguments */
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "-a") == 0) {
@@ -994,14 +1014,14 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 			exit(EXIT_FAILURE);
 		}
 	}
-	
+
 	if (arg_force_affinity) {
 		attrp = &attr;
 	}
-	
+
 	/* Seed random number generator with a constant seed to make the result reproducible */
 	srand(0xdeadbeef);
-	
+
 	/* Less output when repeating */
 	if (arg_num_repeat > 1) {
 		quiet_mode = 1;
@@ -1009,7 +1029,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	if (quiet_mode) {
 		measure_flags |= MEASURE_FLAG_NO_PRINT;
 	}
-	
+
 	if (arg_do_measure) {
 		if (!measure_init_papi(measure_flags)) {
 			fprintf(stderr, "Warning: measure_init_papi failed, disabling measurements.\n");
@@ -1020,14 +1040,14 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 			arg_do_measure = 0;
 		}
 	}
-	
+
 	/* Allocate data structures for threads */
 	targs = measure_alloc(arg_num_threads * sizeof(*targs));
 	if (targs == NULL) {
 		fprintf(stderr, "Error: measure_alloc failed!\n");
 		exit(EXIT_FAILURE);
 	}
-	
+
 	/* Call initialization hook for every thread structure */
 	for (i = 0; i < arg_num_threads; i++) {
 		/* Copy arguments */
@@ -1038,7 +1058,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	for (i = 0; i < arg_num_threads; i++) {
 		rval = pthread_join(targs[i].thread_id, &thread_result);
 	}
-	
+
 	// Print CSV-output column names
 	if (arg_do_measure && arg_num_repeat > 1) {
 		printf("num_threads"
@@ -1047,7 +1067,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		       "\n");
 		fflush(stdout);
 	}
-	
+
 	/* Buffers for storing repeated measurements */
 	double *pkg_power_normal = NULL, *pp0_power_normal = NULL;
 	double *pkg_power_extreme = NULL, *pp0_power_extreme = NULL;
@@ -1055,7 +1075,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	double *uops_issued_normal = NULL, *uops_issued_extreme = NULL;
 	double *idq_mite_uops_normal = NULL, *idq_mite_uops_extreme = NULL;
 	double *pkg_temp_normal = NULL, *pkg_temp_extreme = NULL;
-	
+
 	/* Allocate buffers */
 	if (arg_do_measure) {
 		const long buffer_size = arg_num_repeat * sizeof(double);
@@ -1066,12 +1086,12 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		idq_mite_uops_normal = measure_alloc(buffer_size), idq_mite_uops_extreme = measure_alloc(buffer_size);
 		pkg_temp_normal = measure_alloc(buffer_size), pkg_temp_extreme = measure_alloc(buffer_size);
 	}
-	
+
 	/* Warmup for normal version */
 	if (arg_benchmark_phase == -1 || arg_benchmark_phase == 1) {
 		phase_warmup(bench, quiet_mode, bench->normal, targs, attrp);
 	}
-	
+
 	/* Normal version */
 	if (arg_benchmark_phase == -1 || arg_benchmark_phase == 2) {
 		/* Repeat requested number of times */
@@ -1116,7 +1136,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 			}
 		}
 	}
-	
+
 	/* Warmup for extreme version */
 	if (arg_benchmark_phase == -1 || arg_benchmark_phase == 3) {
 		if (!quiet_mode) {
@@ -1126,7 +1146,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		}
 		phase_warmup(bench, quiet_mode, bench->extreme, targs, attrp);
 	}
-	
+
 	/* Extreme unrolled version */
 	if (arg_benchmark_phase == -1 || arg_benchmark_phase == 4) {
 		/* Repeat requested number of times */
@@ -1171,7 +1191,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 			}
 		}
 	}
-	
+
 	/* Print compact power consumption numbers when repeating multiple times */
 	if (arg_do_measure && arg_num_repeat > 1) {
 		for (j = 0; j < arg_num_repeat; j++) {
@@ -1183,12 +1203,12 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 		}
 		fflush(stdout);
 	}
-	
+
 	/* Call cleanup hook for every thread structure */
 	for (i = 0; i < arg_num_threads; i++) {
 		bench->cleanup(targs[i].benchdata);
 	}
-	
+
 	/* Clean up */
 	if (arg_do_measure) {
 		free(pkg_power_normal);
@@ -1207,7 +1227,7 @@ int measure_main(int argc, char **argv, measure_benchmark_t *bench) {
 	}
 	free(targs);
 	pthread_attr_destroy(&attr);
-	
+
 	/* Success */
 	return EXIT_SUCCESS;
 }
